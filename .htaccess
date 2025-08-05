@@ -1,0 +1,33 @@
+# Resgrow CRM - Apache Configuration
+# Phase 1: Project Setup & Auth
+
+# Enable URL Rewriting
+RewriteEngine On
+
+# Security Headers
+Header always set X-Content-Type-Options nosniff
+Header always set X-Frame-Options DENY
+Header always set X-XSS-Protection "1; mode=block"
+
+# Protect sensitive files
+<Files "config.php">
+    Order allow,deny
+    Deny from all
+</Files>
+
+<Files "*.log">
+    Order allow,deny
+    Deny from all
+</Files>
+
+# Redirect to login if accessing root
+RewriteCond %{REQUEST_URI} ^/$
+RewriteRule ^(.*)$ /public/login.php [R=302,L]
+
+# Directory index files
+DirectoryIndex index.php login.php
+
+# Hide PHP extension (optional)
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^([^\.]+)$ $1.php [NC,L]
