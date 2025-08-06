@@ -1,33 +1,45 @@
 <?php
-// Resgrow CRM - Quick Setup Script
+// Resgrow CRM - Quick Setup Script (FIXED)
 // Phase 3: Admin Dashboard - Database Setup
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 echo "<h1>🚀 Resgrow CRM Quick Setup</h1>";
-echo "<style>body{font-family:Arial;margin:20px;} .ok{color:green;} .error{color:red;}</style>";
+echo "<style>body{font-family:Arial;margin:20px;} .ok{color:green;background:#d4edda;padding:10px;margin:5px 0;border-radius:5px;} .error{color:red;background:#f8d7da;padding:10px;margin:5px 0;border-radius:5px;} .info{background:#d1ecf1;padding:10px;margin:5px 0;border-radius:5px;}</style>";
 
-// Load configuration
+echo "<div class='info'>📋 <strong>Setup Progress:</strong></div>";
+
+// Step 1: Load configuration
+echo "<h2>Step 1: Loading Configuration</h2>";
 try {
     require_once '../config.php';
-    echo "<div class='ok'>✅ Configuration loaded</div>";
+    echo "<div class='ok'>✅ Configuration loaded successfully</div>";
+    echo "<div class='info'>Database: " . DB_NAME . " | Host: " . DB_HOST . "</div>";
 } catch (Exception $e) {
     die("<div class='error'>❌ Config error: " . $e->getMessage() . "</div>");
 }
 
-// Connect to database
+// Step 2: Test database connection
+echo "<h2>Step 2: Testing Database Connection</h2>";
 try {
     $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
     if ($conn->connect_error) {
-        die("<div class='error'>❌ Database connection failed: " . $conn->connect_error . "</div>");
+        die("<div class='error'>❌ Database connection failed: " . $conn->connect_error . "<br>
+             Please check your database credentials in config.php</div>");
     }
-    echo "<div class='ok'>✅ Database connected</div>";
+    echo "<div class='ok'>✅ Database connected successfully</div>";
+    
+    // Set charset
+    $conn->set_charset("utf8mb4");
+    
 } catch (Exception $e) {
     die("<div class='error'>❌ Database error: " . $e->getMessage() . "</div>");
 }
 
-// Create tables if they don't exist
+// Step 3: Create tables
+echo "<h2>Step 3: Creating Database Tables</h2>";
+
 $tables_sql = [
     'users' => "
         CREATE TABLE IF NOT EXISTS `users` (
@@ -48,7 +60,7 @@ $tables_sql = [
             KEY `idx_email` (`email`),
             KEY `idx_role` (`role`),
             KEY `idx_status` (`status`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ",
     
     'campaigns' => "
@@ -72,7 +84,7 @@ $tables_sql = [
             KEY `idx_created_by` (`created_by`),
             KEY `idx_assigned_to` (`assigned_to`),
             KEY `idx_status` (`status`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ",
     
     'leads' => "
@@ -99,7 +111,7 @@ $tables_sql = [
             KEY `idx_assigned_to` (`assigned_to`),
             KEY `idx_platform` (`platform`),
             KEY `idx_status` (`status`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ",
     
     'lead_feedback' => "
@@ -115,7 +127,7 @@ $tables_sql = [
             PRIMARY KEY (`id`),
             KEY `idx_lead_id` (`lead_id`),
             KEY `idx_sales_id` (`sales_id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ",
     
     'activity_log' => "
@@ -131,73 +143,131 @@ $tables_sql = [
             PRIMARY KEY (`id`),
             KEY `idx_user_id` (`user_id`),
             KEY `idx_action` (`action`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     "
 ];
 
-// Create tables
+// Create each table
 foreach ($tables_sql as $table_name => $sql) {
     if ($conn->query($sql)) {
-        echo "<div class='ok'>✅ Table '$table_name' created/verified</div>";
+        echo "<div class='ok'>✅ Table '$table_name' created/verified successfully</div>";
     } else {
         echo "<div class='error'>❌ Error creating table '$table_name': " . $conn->error . "</div>";
+        echo "<div class='info'>SQL: " . substr($sql, 0, 100) . "...</div>";
     }
 }
 
-// Insert default admin user if none exists
+// Step 4: Create default admin user
+echo "<h2>Step 4: Creating Default Admin User</h2>";
+
 $admin_check = $conn->query("SELECT COUNT(*) as count FROM users WHERE role = 'admin'");
 if ($admin_check) {
     $admin_count = $admin_check->fetch_assoc()['count'];
     if ($admin_count == 0) {
         $default_password = password_hash('admin123', PASSWORD_DEFAULT);
-        $insert_admin = "INSERT INTO users (name, email, password, role, status) VALUES 
-                        ('System Administrator', 'admin@resgrow.com', '$default_password', 'admin', 'active')";
+        $insert_admin = "INSERT INTO users (name, email, password, role, status, created_at) VALUES 
+                        ('System Administrator', 'admin@resgrow.com', ?, 'admin', 'active', NOW())";
         
-        if ($conn->query($insert_admin)) {
-            echo "<div class='ok'>✅ Default admin user created</div>";
-            echo "<div style='background:#fff3cd;padding:10px;border:1px solid #ffeaa7;margin:10px 0;'>
-                    <strong>📧 Login Credentials:</strong><br>
-                    Email: admin@resgrow.com<br>
-                    Password: admin123<br>
-                    <em>Please change this password after first login!</em>
+        $stmt = $conn->prepare($insert_admin);
+        if ($stmt && $stmt->bind_param("s", $default_password) && $stmt->execute()) {
+            echo "<div class='ok'>✅ Default admin user created successfully</div>";
+            echo "<div style='background:#fff3cd;padding:15px;border:1px solid #ffeaa7;margin:10px 0;border-radius:5px;'>
+                    <strong>🔑 Login Credentials:</strong><br>
+                    <strong>Email:</strong> admin@resgrow.com<br>
+                    <strong>Password:</strong> admin123<br>
+                    <em style='color:#856404;'>⚠️ Please change this password after first login!</em>
                   </div>";
         } else {
             echo "<div class='error'>❌ Error creating admin user: " . $conn->error . "</div>";
         }
     } else {
-        echo "<div class='ok'>✅ Admin user already exists</div>";
+        echo "<div class='ok'>✅ Admin user already exists ($admin_count found)</div>";
     }
 }
 
-// Insert sample data
-$sample_campaign = "INSERT IGNORE INTO campaigns (id, title, product_name, description, platforms, budget_qr, created_by, start_date, end_date, status) VALUES 
-                   (1, 'Test Campaign', 'Sample Product', 'Sample campaign for testing', '[\"Meta\", \"TikTok\"]', 1000.00, 1, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), 'active')";
+// Step 5: Insert sample data
+echo "<h2>Step 5: Creating Sample Data</h2>";
 
-if ($conn->query($sample_campaign)) {
-    echo "<div class='ok'>✅ Sample campaign created</div>";
+// Sample marketing user
+$marketing_check = $conn->query("SELECT COUNT(*) as count FROM users WHERE role = 'marketing'");
+if ($marketing_check && $marketing_check->fetch_assoc()['count'] == 0) {
+    $marketing_password = password_hash('marketing123', PASSWORD_DEFAULT);
+    $insert_marketing = "INSERT INTO users (name, email, password, role, status) VALUES 
+                        ('Marketing Manager', 'marketing@resgrow.com', ?, 'marketing', 'active')";
+    $stmt = $conn->prepare($insert_marketing);
+    if ($stmt && $stmt->bind_param("s", $marketing_password) && $stmt->execute()) {
+        echo "<div class='ok'>✅ Sample marketing user created</div>";
+    }
 }
 
-$sample_leads = "INSERT IGNORE INTO leads (id, full_name, phone, email, campaign_id, platform, product, assigned_to, status, sale_value_qr) VALUES 
-                (1, 'Ahmed Al-Mansouri', '+97455123456', 'ahmed@example.com', 1, 'Meta', 'Sample Product', 1, 'closed-won', 150.00),
-                (2, 'Fatima Al-Thani', '+97455789012', 'fatima@example.com', 1, 'TikTok', 'Sample Product', 1, 'follow-up', NULL),
-                (3, 'Mohammed Al-Kuwari', '+97455345678', 'mohammed@example.com', 1, 'WhatsApp', 'Sample Product', 1, 'new', NULL)";
+// Sample sales user
+$sales_check = $conn->query("SELECT COUNT(*) as count FROM users WHERE role = 'sales'");
+if ($sales_check && $sales_check->fetch_assoc()['count'] == 0) {
+    $sales_password = password_hash('sales123', PASSWORD_DEFAULT);
+    $insert_sales = "INSERT INTO users (name, email, password, role, status) VALUES 
+                    ('Sales Representative', 'sales@resgrow.com', ?, 'sales', 'active')";
+    $stmt = $conn->prepare($insert_sales);
+    if ($stmt && $stmt->bind_param("s", $sales_password) && $stmt->execute()) {
+        echo "<div class='ok'>✅ Sample sales user created</div>";
+    }
+}
 
-if ($conn->query($sample_leads)) {
+// Sample campaign
+$campaign_check = $conn->query("SELECT COUNT(*) as count FROM campaigns");
+if ($campaign_check && $campaign_check->fetch_assoc()['count'] == 0) {
+    $insert_campaign = "INSERT INTO campaigns (title, product_name, description, platforms, budget_qr, created_by, start_date, end_date, status) VALUES 
+                       ('Winter Coffee Promotion', 'Premium Coffee Blend', 'Target coffee lovers during winter season', '[\"Meta\", \"TikTok\"]', 5000.00, 1, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), 'active')";
+    if ($conn->query($insert_campaign)) {
+        echo "<div class='ok'>✅ Sample campaign created</div>";
+    }
+}
+
+// Sample leads
+$leads_check = $conn->query("SELECT COUNT(*) as count FROM leads");
+if ($leads_check && $leads_check->fetch_assoc()['count'] == 0) {
+    $sample_leads = [
+        ['Ahmed Al-Mansouri', '+97455123456', 'ahmed@example.com', 1, 'Meta', 'Premium Coffee Blend', 3, 'closed-won', 150.00],
+        ['Fatima Al-Thani', '+97455789012', 'fatima@example.com', 1, 'TikTok', 'Premium Coffee Blend', 3, 'follow-up', NULL],
+        ['Mohammed Al-Kuwari', '+97455345678', 'mohammed@example.com', 1, 'WhatsApp', 'Premium Coffee Blend', 3, 'new', NULL]
+    ];
+    
+    $insert_lead = "INSERT INTO leads (full_name, phone, email, campaign_id, platform, product, assigned_to, status, sale_value_qr) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    $stmt = $conn->prepare($insert_lead);
+    
+    foreach ($sample_leads as $lead) {
+        $stmt->bind_param("sssissssd", $lead[0], $lead[1], $lead[2], $lead[3], $lead[4], $lead[5], $lead[6], $lead[7], $lead[8]);
+        $stmt->execute();
+    }
     echo "<div class='ok'>✅ Sample leads created</div>";
 }
 
 $conn->close();
 
-echo "<h2>🎉 Setup Complete!</h2>";
-echo "<p><strong>Next Steps:</strong></p>";
-echo "<ol>";
-echo "<li><a href='debug.php'>Run system diagnostics</a></li>";
-echo "<li><a href='../public/login.php'>Go to login page</a></li>";
-echo "<li><a href='dashboard.php'>Test admin dashboard (after login)</a></li>";
-echo "</ol>";
+// Step 6: Final verification
+echo "<h2>Step 6: Final Verification</h2>";
+echo "<div class='ok'>✅ Database setup completed successfully!</div>";
 
-echo "<div style='background:#d4edda;padding:15px;border:1px solid #c3e6cb;margin:20px 0;'>
-        <strong>✅ Setup completed successfully!</strong><br>
-        Your Resgrow CRM is now ready to use.
+echo "<h2>🎉 Setup Complete!</h2>";
+echo "<div style='background:#d4edda;padding:20px;border:1px solid #c3e6cb;margin:20px 0;border-radius:5px;'>
+        <h3>🚀 Your Resgrow CRM is now ready!</h3>
+        
+        <h4>👥 User Accounts Created:</h4>
+        <ul>
+            <li><strong>Admin:</strong> admin@resgrow.com / admin123</li>
+            <li><strong>Marketing:</strong> marketing@resgrow.com / marketing123</li>
+            <li><strong>Sales:</strong> sales@resgrow.com / sales123</li>
+        </ul>
+        
+        <h4>📋 Next Steps:</h4>
+        <ol>
+            <li><a href='debug.php' style='color:#155724;font-weight:bold;'>Run system diagnostics</a></li>
+            <li><a href='../public/login.php' style='color:#155724;font-weight:bold;'>Go to login page</a></li>
+            <li><a href='dashboard.php' style='color:#155724;font-weight:bold;'>Test admin dashboard (after login)</a></li>
+        </ol>
+      </div>";
+
+echo "<div style='background:#fff3cd;padding:15px;border:1px solid #ffeaa7;margin:10px 0;border-radius:5px;'>
+        <strong>🔒 Security Note:</strong><br>
+        Please change all default passwords after first login for security!
       </div>";
 ?>

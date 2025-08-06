@@ -1,8 +1,11 @@
 <?php
-// Resgrow CRM - Database Connection (Debug Version)
-// Phase 3: Admin Dashboard - Debugging
+// Resgrow CRM - Database Connection (FIXED)
+// Phase 1: Project Setup & Auth
 
-require_once '../config.php';
+// Make sure config is loaded first
+if (!defined('DB_HOST')) {
+    require_once __DIR__ . '/../config.php';
+}
 
 class Database {
     private $connection;
@@ -13,7 +16,7 @@ class Database {
     
     private function connect() {
         try {
-            // Enable error reporting for debugging
+            // Enable error reporting for mysqli
             mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
             
             $this->connection = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
@@ -24,22 +27,16 @@ class Database {
             
             $this->connection->set_charset("utf8mb4");
             
-            // Test connection with a simple query
-            $test_query = "SELECT 1 as test";
-            $result = $this->connection->query($test_query);
-            if (!$result) {
-                throw new Exception("Test query failed: " . $this->connection->error);
-            }
-            
-            // Debug: Uncomment to see connection success
-            // error_log("Database connection successful");
-            
         } catch (Exception $e) {
             error_log("Database connection error: " . $e->getMessage());
             
             // Show detailed error in development
             if (defined('DEVELOPMENT') && DEVELOPMENT === true) {
-                die("Database Error: " . $e->getMessage() . "<br>Check your database credentials in config.php");
+                die("Database Error: " . $e->getMessage() . "<br>
+                     Host: " . DB_HOST . "<br>
+                     User: " . DB_USER . "<br>
+                     Database: " . DB_NAME . "<br>
+                     Check your database credentials in config.php");
             } else {
                 die("Database connection failed. Please check configuration.");
             }
@@ -51,21 +48,31 @@ class Database {
     }
     
     public function query($sql) {
-        $result = $this->connection->query($sql);
-        if (!$result) {
-            error_log("Query error: " . $this->connection->error . " | SQL: " . $sql);
+        try {
+            $result = $this->connection->query($sql);
+            if (!$result) {
+                error_log("Query error: " . $this->connection->error . " | SQL: " . $sql);
+                return false;
+            }
+            return $result;
+        } catch (Exception $e) {
+            error_log("Query exception: " . $e->getMessage() . " | SQL: " . $sql);
             return false;
         }
-        return $result;
     }
     
     public function prepare($sql) {
-        $stmt = $this->connection->prepare($sql);
-        if (!$stmt) {
-            error_log("Prepare error: " . $this->connection->error . " | SQL: " . $sql);
+        try {
+            $stmt = $this->connection->prepare($sql);
+            if (!$stmt) {
+                error_log("Prepare error: " . $this->connection->error . " | SQL: " . $sql);
+                return false;
+            }
+            return $stmt;
+        } catch (Exception $e) {
+            error_log("Prepare exception: " . $e->getMessage() . " | SQL: " . $sql);
             return false;
         }
-        return $stmt;
     }
     
     public function escape($string) {
@@ -96,24 +103,32 @@ class Database {
         
         return $missing_tables;
     }
+    
+    // Get table info for debugging
+    public function getTableInfo($table_name) {
+        $result = $this->query("DESCRIBE `$table_name`");
+        if ($result) {
+            $columns = [];
+            while ($row = $result->fetch_assoc()) {
+                $columns[] = $row;
+            }
+            return $columns;
+        }
+        return false;
+    }
 }
 
-// Create global database instance
-try {
-    $db = new Database();
-    
-    // Check for missing tables in development
-    if (defined('DEVELOPMENT') && DEVELOPMENT === true) {
-        $missing_tables = $db->checkTables();
-        if (!empty($missing_tables)) {
-            error_log("Missing database tables: " . implode(', ', $missing_tables));
+// Create global database instance - but only if needed
+if (!isset($GLOBALS['db'])) {
+    try {
+        $GLOBALS['db'] = new Database();
+        // Make it available as $db in global scope
+        $db = $GLOBALS['db'];
+    } catch (Exception $e) {
+        error_log("Failed to create database instance: " . $e->getMessage());
+        if (defined('DEVELOPMENT') && DEVELOPMENT === true) {
+            die("Database initialization failed: " . $e->getMessage());
         }
-    }
-    
-} catch (Exception $e) {
-    error_log("Failed to create database instance: " . $e->getMessage());
-    if (defined('DEVELOPMENT') && DEVELOPMENT === true) {
-        die("Database initialization failed: " . $e->getMessage());
     }
 }
 ?>
