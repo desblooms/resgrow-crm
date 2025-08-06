@@ -1,5 +1,5 @@
 <?php
-// Resgrow CRM - Quick Setup Script (FIXED)
+// Resgrow CRM - Quick Setup Script (FIXED - Foreign Keys)
 // Phase 3: Admin Dashboard - Database Setup
 
 error_reporting(E_ALL);
@@ -37,12 +37,24 @@ try {
     die("<div class='error'>❌ Database error: " . $e->getMessage() . "</div>");
 }
 
-// Step 3: Create tables
-echo "<h2>Step 3: Creating Database Tables</h2>";
+// Step 3: Drop existing tables if they exist (to handle foreign key constraints)
+echo "<h2>Step 3: Cleaning Existing Tables</h2>";
+
+// Disable foreign key checks temporarily
+$conn->query("SET FOREIGN_KEY_CHECKS = 0");
+
+$tables_to_drop = ['lead_feedback', 'leads', 'campaigns', 'activity_log', 'users'];
+foreach ($tables_to_drop as $table) {
+    $conn->query("DROP TABLE IF EXISTS `$table`");
+    echo "<div class='info'>🗑️ Dropped table '$table' if it existed</div>";
+}
+
+// Step 4: Create tables in correct order
+echo "<h2>Step 4: Creating Database Tables</h2>";
 
 $tables_sql = [
     'users' => "
-        CREATE TABLE IF NOT EXISTS `users` (
+        CREATE TABLE `users` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
             `name` varchar(100) NOT NULL,
             `email` varchar(150) NOT NULL UNIQUE,
@@ -64,7 +76,7 @@ $tables_sql = [
     ",
     
     'campaigns' => "
-        CREATE TABLE IF NOT EXISTS `campaigns` (
+        CREATE TABLE `campaigns` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
             `title` varchar(200) NOT NULL,
             `product_name` varchar(200) NOT NULL,
@@ -83,12 +95,14 @@ $tables_sql = [
             PRIMARY KEY (`id`),
             KEY `idx_created_by` (`created_by`),
             KEY `idx_assigned_to` (`assigned_to`),
-            KEY `idx_status` (`status`)
+            KEY `idx_status` (`status`),
+            FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+            FOREIGN KEY (`assigned_to`) REFERENCES `users` (`id`) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ",
     
     'leads' => "
-        CREATE TABLE IF NOT EXISTS `leads` (
+        CREATE TABLE `leads` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
             `full_name` varchar(150) NOT NULL,
             `phone` varchar(20) NOT NULL,
@@ -108,14 +122,19 @@ $tables_sql = [
             `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
             KEY `idx_phone` (`phone`),
+            KEY `idx_email` (`email`),
+            KEY `idx_campaign_id` (`campaign_id`),
             KEY `idx_assigned_to` (`assigned_to`),
             KEY `idx_platform` (`platform`),
-            KEY `idx_status` (`status`)
+            KEY `idx_status` (`status`),
+            KEY `idx_created_at` (`created_at`),
+            FOREIGN KEY (`campaign_id`) REFERENCES `campaigns` (`id`) ON DELETE SET NULL,
+            FOREIGN KEY (`assigned_to`) REFERENCES `users` (`id`) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ",
     
     'lead_feedback' => "
-        CREATE TABLE IF NOT EXISTS `lead_feedback` (
+        CREATE TABLE `lead_feedback` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
             `lead_id` int(11) NOT NULL,
             `sales_id` int(11) NOT NULL,
@@ -126,12 +145,15 @@ $tables_sql = [
             `submitted_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
             KEY `idx_lead_id` (`lead_id`),
-            KEY `idx_sales_id` (`sales_id`)
+            KEY `idx_sales_id` (`sales_id`),
+            KEY `idx_feedback_type` (`feedback_type`),
+            FOREIGN KEY (`lead_id`) REFERENCES `leads` (`id`) ON DELETE CASCADE,
+            FOREIGN KEY (`sales_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ",
     
     'activity_log' => "
-        CREATE TABLE IF NOT EXISTS `activity_log` (
+        CREATE TABLE `activity_log` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
             `user_id` int(11) DEFAULT NULL,
             `action` varchar(100) NOT NULL,
@@ -142,109 +164,129 @@ $tables_sql = [
             `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
             KEY `idx_user_id` (`user_id`),
-            KEY `idx_action` (`action`)
+            KEY `idx_action` (`action`),
+            KEY `idx_created_at` (`created_at`),
+            FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     "
 ];
 
-// Create each table
+// Create each table in order (users first, then tables that reference users)
 foreach ($tables_sql as $table_name => $sql) {
     if ($conn->query($sql)) {
-        echo "<div class='ok'>✅ Table '$table_name' created/verified successfully</div>";
+        echo "<div class='ok'>✅ Table '$table_name' created successfully</div>";
     } else {
         echo "<div class='error'>❌ Error creating table '$table_name': " . $conn->error . "</div>";
-        echo "<div class='info'>SQL: " . substr($sql, 0, 100) . "...</div>";
+        die("<div class='error'>Setup stopped due to table creation error.</div>");
     }
 }
 
-// Step 4: Create default admin user
-echo "<h2>Step 4: Creating Default Admin User</h2>";
+// Re-enable foreign key checks
+$conn->query("SET FOREIGN_KEY_CHECKS = 1");
 
-$admin_check = $conn->query("SELECT COUNT(*) as count FROM users WHERE role = 'admin'");
-if ($admin_check) {
-    $admin_count = $admin_check->fetch_assoc()['count'];
-    if ($admin_count == 0) {
-        $default_password = password_hash('admin123', PASSWORD_DEFAULT);
-        $insert_admin = "INSERT INTO users (name, email, password, role, status, created_at) VALUES 
-                        ('System Administrator', 'admin@resgrow.com', ?, 'admin', 'active', NOW())";
-        
-        $stmt = $conn->prepare($insert_admin);
-        if ($stmt && $stmt->bind_param("s", $default_password) && $stmt->execute()) {
-            echo "<div class='ok'>✅ Default admin user created successfully</div>";
-            echo "<div style='background:#fff3cd;padding:15px;border:1px solid #ffeaa7;margin:10px 0;border-radius:5px;'>
-                    <strong>🔑 Login Credentials:</strong><br>
-                    <strong>Email:</strong> admin@resgrow.com<br>
-                    <strong>Password:</strong> admin123<br>
-                    <em style='color:#856404;'>⚠️ Please change this password after first login!</em>
-                  </div>";
-        } else {
-            echo "<div class='error'>❌ Error creating admin user: " . $conn->error . "</div>";
-        }
+// Step 5: Create users first (so we have valid IDs for foreign keys)
+echo "<h2>Step 5: Creating User Accounts</h2>";
+
+$users_to_create = [
+    ['System Administrator', 'admin@resgrow.com', 'admin123', 'admin'],
+    ['Marketing Manager', 'marketing@resgrow.com', 'marketing123', 'marketing'],
+    ['Sales Representative', 'sales@resgrow.com', 'sales123', 'sales']
+];
+
+$user_ids = [];
+foreach ($users_to_create as $user_data) {
+    $name = $user_data[0];
+    $email = $user_data[1];
+    $password = password_hash($user_data[2], PASSWORD_DEFAULT);
+    $role = $user_data[3];
+    
+    $insert_user = "INSERT INTO users (name, email, password, role, status, created_at) VALUES (?, ?, ?, ?, 'active', NOW())";
+    $stmt = $conn->prepare($insert_user);
+    
+    if ($stmt && $stmt->bind_param("ssss", $name, $email, $password, $role) && $stmt->execute()) {
+        $user_id = $conn->insert_id;
+        $user_ids[$role] = $user_id;
+        echo "<div class='ok'>✅ User '$name' created (ID: $user_id)</div>";
     } else {
-        echo "<div class='ok'>✅ Admin user already exists ($admin_count found)</div>";
+        echo "<div class='error'>❌ Error creating user '$name': " . $conn->error . "</div>";
     }
 }
 
-// Step 5: Insert sample data
-echo "<h2>Step 5: Creating Sample Data</h2>";
+// Step 6: Create sample campaigns (using valid user IDs)
+echo "<h2>Step 6: Creating Sample Campaigns</h2>";
 
-// Sample marketing user
-$marketing_check = $conn->query("SELECT COUNT(*) as count FROM users WHERE role = 'marketing'");
-if ($marketing_check && $marketing_check->fetch_assoc()['count'] == 0) {
-    $marketing_password = password_hash('marketing123', PASSWORD_DEFAULT);
-    $insert_marketing = "INSERT INTO users (name, email, password, role, status) VALUES 
-                        ('Marketing Manager', 'marketing@resgrow.com', ?, 'marketing', 'active')";
-    $stmt = $conn->prepare($insert_marketing);
-    if ($stmt && $stmt->bind_param("s", $marketing_password) && $stmt->execute()) {
-        echo "<div class='ok'>✅ Sample marketing user created</div>";
-    }
-}
-
-// Sample sales user
-$sales_check = $conn->query("SELECT COUNT(*) as count FROM users WHERE role = 'sales'");
-if ($sales_check && $sales_check->fetch_assoc()['count'] == 0) {
-    $sales_password = password_hash('sales123', PASSWORD_DEFAULT);
-    $insert_sales = "INSERT INTO users (name, email, password, role, status) VALUES 
-                    ('Sales Representative', 'sales@resgrow.com', ?, 'sales', 'active')";
-    $stmt = $conn->prepare($insert_sales);
-    if ($stmt && $stmt->bind_param("s", $sales_password) && $stmt->execute()) {
-        echo "<div class='ok'>✅ Sample sales user created</div>";
-    }
-}
-
-// Sample campaign
-$campaign_check = $conn->query("SELECT COUNT(*) as count FROM campaigns");
-if ($campaign_check && $campaign_check->fetch_assoc()['count'] == 0) {
-    $insert_campaign = "INSERT INTO campaigns (title, product_name, description, platforms, budget_qr, created_by, start_date, end_date, status) VALUES 
-                       ('Winter Coffee Promotion', 'Premium Coffee Blend', 'Target coffee lovers during winter season', '[\"Meta\", \"TikTok\"]', 5000.00, 1, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), 'active')";
-    if ($conn->query($insert_campaign)) {
-        echo "<div class='ok'>✅ Sample campaign created</div>";
-    }
-}
-
-// Sample leads
-$leads_check = $conn->query("SELECT COUNT(*) as count FROM leads");
-if ($leads_check && $leads_check->fetch_assoc()['count'] == 0) {
-    $sample_leads = [
-        ['Ahmed Al-Mansouri', '+97455123456', 'ahmed@example.com', 1, 'Meta', 'Premium Coffee Blend', 3, 'closed-won', 150.00],
-        ['Fatima Al-Thani', '+97455789012', 'fatima@example.com', 1, 'TikTok', 'Premium Coffee Blend', 3, 'follow-up', NULL],
-        ['Mohammed Al-Kuwari', '+97455345678', 'mohammed@example.com', 1, 'WhatsApp', 'Premium Coffee Blend', 3, 'new', NULL]
+if (isset($user_ids['admin'])) {
+    $admin_id = $user_ids['admin'];
+    $marketing_id = isset($user_ids['marketing']) ? $user_ids['marketing'] : $admin_id;
+    
+    $sample_campaigns = [
+        ['Winter Coffee Promotion', 'Premium Coffee Blend', 'Target coffee lovers during winter season', '["Meta", "TikTok"]', 5000.00],
+        ['Qatar National Day Special', 'Traditional Sweets', 'Celebrate Qatar National Day with traditional sweets', '["Meta", "WhatsApp"]', 3000.00]
     ];
     
-    $insert_lead = "INSERT INTO leads (full_name, phone, email, campaign_id, platform, product, assigned_to, status, sale_value_qr) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-    $stmt = $conn->prepare($insert_lead);
-    
-    foreach ($sample_leads as $lead) {
-        $stmt->bind_param("sssissssd", $lead[0], $lead[1], $lead[2], $lead[3], $lead[4], $lead[5], $lead[6], $lead[7], $lead[8]);
-        $stmt->execute();
+    foreach ($sample_campaigns as $index => $campaign_data) {
+        $title = $campaign_data[0];
+        $product = $campaign_data[1];
+        $description = $campaign_data[2];
+        $platforms = $campaign_data[3];
+        $budget = $campaign_data[4];
+        
+        $status = $index == 0 ? 'active' : 'completed';
+        
+        $insert_campaign = "INSERT INTO campaigns (title, product_name, description, platforms, budget_qr, created_by, assigned_to, start_date, end_date, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), ?, NOW())";
+        $stmt = $conn->prepare($insert_campaign);
+        
+        if ($stmt && $stmt->bind_param("ssssdiiis", $title, $product, $description, $platforms, $budget, $marketing_id, $marketing_id, $status) && $stmt->execute()) {
+            $campaign_id = $conn->insert_id;
+            echo "<div class='ok'>✅ Campaign '$title' created (ID: $campaign_id)</div>";
+            
+            // Store campaign ID for leads
+            if ($index == 0) {
+                $active_campaign_id = $campaign_id;
+            }
+        } else {
+            echo "<div class='error'>❌ Error creating campaign '$title': " . $conn->error . "</div>";
+        }
     }
-    echo "<div class='ok'>✅ Sample leads created</div>";
+}
+
+// Step 7: Create sample leads (using valid campaign and user IDs)
+echo "<h2>Step 7: Creating Sample Leads</h2>";
+
+if (isset($active_campaign_id) && isset($user_ids['sales'])) {
+    $sales_id = $user_ids['sales'];
+    
+    $sample_leads = [
+        ['Ahmed Al-Mansouri', '+97455123456', 'ahmed@example.com', 'Meta', 'closed-won', 150.00],
+        ['Fatima Al-Thani', '+97455789012', 'fatima@example.com', 'TikTok', 'follow-up', NULL],
+        ['Mohammed Al-Kuwari', '+97455345678', 'mohammed@example.com', 'WhatsApp', 'new', NULL],
+        ['Sarah Al-Naimi', '+97455987654', 'sarah@example.com', 'Meta', 'contacted', NULL],
+        ['Omar Al-Sulaiti', '+97455456789', 'omar@example.com', 'Google', 'closed-won', 200.00]
+    ];
+    
+    foreach ($sample_leads as $lead_data) {
+        $name = $lead_data[0];
+        $phone = $lead_data[1];
+        $email = $lead_data[2];
+        $platform = $lead_data[3];
+        $status = $lead_data[4];
+        $sale_value = $lead_data[5];
+        
+        $insert_lead = "INSERT INTO leads (full_name, phone, email, campaign_id, platform, product, assigned_to, status, sale_value_qr, created_at) VALUES (?, ?, ?, ?, ?, 'Premium Coffee Blend', ?, ?, ?, NOW())";
+        $stmt = $conn->prepare($insert_lead);
+        
+        if ($stmt && $stmt->bind_param("sssisssd", $name, $phone, $email, $active_campaign_id, $platform, $sales_id, $status, $sale_value) && $stmt->execute()) {
+            echo "<div class='ok'>✅ Lead '$name' created</div>";
+        } else {
+            echo "<div class='error'>❌ Error creating lead '$name': " . $conn->error . "</div>";
+        }
+    }
 }
 
 $conn->close();
 
-// Step 6: Final verification
-echo "<h2>Step 6: Final Verification</h2>";
+// Step 8: Final verification
+echo "<h2>Step 8: Final Verification</h2>";
 echo "<div class='ok'>✅ Database setup completed successfully!</div>";
 
 echo "<h2>🎉 Setup Complete!</h2>";
@@ -258,6 +300,13 @@ echo "<div style='background:#d4edda;padding:20px;border:1px solid #c3e6cb;margi
             <li><strong>Sales:</strong> sales@resgrow.com / sales123</li>
         </ul>
         
+        <h4>📊 Sample Data Created:</h4>
+        <ul>
+            <li>2 Sample campaigns</li>
+            <li>5 Sample leads with different statuses</li>
+            <li>Realistic Qatar F&B market data</li>
+        </ul>
+        
         <h4>📋 Next Steps:</h4>
         <ol>
             <li><a href='debug.php' style='color:#155724;font-weight:bold;'>Run system diagnostics</a></li>
@@ -269,5 +318,12 @@ echo "<div style='background:#d4edda;padding:20px;border:1px solid #c3e6cb;margi
 echo "<div style='background:#fff3cd;padding:15px;border:1px solid #ffeaa7;margin:10px 0;border-radius:5px;'>
         <strong>🔒 Security Note:</strong><br>
         Please change all default passwords after first login for security!
+      </div>";
+
+echo "<div style='background:#cff4fc;padding:15px;border:1px solid #b3ebf2;margin:10px 0;border-radius:5px;'>
+        <strong>🎯 Test the System:</strong><br>
+        1. Login as admin and check the dashboard<br>
+        2. Login as marketing@resgrow.com to see marketing features<br>
+        3. Login as sales@resgrow.com to see sales features<br>
       </div>";
 ?>
