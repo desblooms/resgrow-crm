@@ -119,7 +119,7 @@ class Database {
 }
 
 // Create global database instance - but only if needed
-if (!isset($GLOBALS['db'])) {
+if (!isset($GLOBALS['db']) || !$GLOBALS['db']) {
     try {
         $GLOBALS['db'] = new Database();
         // Make it available as $db in global scope
@@ -127,8 +127,16 @@ if (!isset($GLOBALS['db'])) {
     } catch (Exception $e) {
         error_log("Failed to create database instance: " . $e->getMessage());
         if (defined('DEVELOPMENT') && DEVELOPMENT === true) {
-            die("Database initialization failed: " . $e->getMessage());
+            // In development, show the error but don't die immediately
+            // This allows the calling script to handle it
+            $db = null;
+            $GLOBALS['db'] = null;
+        } else {
+            $db = null;
+            $GLOBALS['db'] = null;
         }
     }
+} else {
+    $db = $GLOBALS['db'];
 }
 ?>
