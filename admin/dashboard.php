@@ -1,19 +1,28 @@
 <?php
-// Resgrow CRM - Admin Dashboard
+// Resgrow CRM - Admin Dashboard (FIXED)
 // Phase 3: Admin Dashboard
 
 require_once '../includes/session.php';
 require_once '../includes/functions.php';
+require_once '../includes/db.php';
 
 // Require admin access
 SessionManager::requireRole('admin');
 
 $page_title = 'Admin Dashboard';
 
+// Initialize database connection
+global $db;
+if (!isset($db) || !$db) {
+    try {
+        $db = new Database();
+    } catch (Exception $e) {
+        die("Database connection failed: " . $e->getMessage());
+    }
+}
+
 // Get dashboard statistics
 try {
-    global $db;
-    
     // Get overall stats
     $stats_query = "
         SELECT 
@@ -27,19 +36,23 @@ try {
     ";
     
     $stats_result = $db->query($stats_query);
+    if (!$stats_result) {
+        throw new Exception("Failed to get dashboard stats");
+    }
     $stats = $stats_result->fetch_assoc();
     
-    // Get recent activity
-    $recent_activity = $db->query("
+    // Get recent activity (with error handling)
+    $recent_activity_query = "
         SELECT al.*, u.name as user_name 
         FROM activity_log al 
         LEFT JOIN users u ON al.user_id = u.id 
         ORDER BY al.created_at DESC 
         LIMIT 10
-    ");
+    ";
+    $recent_activity = $db->query($recent_activity_query);
     
     // Get top performing sales agents
-    $top_sales = $db->query("
+    $top_sales_query = "
         SELECT 
             u.name,
             COUNT(l.id) as total_leads,
@@ -52,12 +65,14 @@ try {
         LEFT JOIN leads l ON u.id = l.assigned_to
         WHERE u.role = 'sales' AND u.status = 'active'
         GROUP BY u.id, u.name
+        HAVING COUNT(l.id) > 0
         ORDER BY total_revenue DESC
         LIMIT 5
-    ");
+    ";
+    $top_sales = $db->query($top_sales_query);
     
     // Get campaign performance
-    $campaign_performance = $db->query("
+    $campaign_performance_query = "
         SELECT 
             c.title,
             c.budget_qr,
@@ -68,12 +83,14 @@ try {
         LEFT JOIN leads l ON c.id = l.campaign_id
         WHERE c.status = 'active'
         GROUP BY c.id, c.title, c.budget_qr
+        HAVING COUNT(l.id) > 0
         ORDER BY revenue DESC
         LIMIT 5
-    ");
+    ";
+    $campaign_performance = $db->query($campaign_performance_query);
     
     // Get platform performance
-    $platform_stats = $db->query("
+    $platform_stats_query = "
         SELECT 
             platform,
             COUNT(*) as lead_count,
@@ -82,7 +99,8 @@ try {
         FROM leads 
         GROUP BY platform
         ORDER BY revenue DESC
-    ");
+    ";
+    $platform_stats = $db->query($platform_stats_query);
     
     // Calculate conversion rate
     $conversion_rate = $stats['total_leads'] > 0 ? 
@@ -90,12 +108,18 @@ try {
     
 } catch (Exception $e) {
     log_error("Dashboard query error: " . $e->getMessage());
-    set_flash_message('error', 'Error loading dashboard data');
+    set_flash_message('error', 'Error loading dashboard data: ' . $e->getMessage());
+    
+    // Set default values to prevent further errors
     $stats = [
         'active_users' => 0, 'total_campaigns' => 0, 'total_leads' => 0,
         'new_leads' => 0, 'closed_deals' => 0, 'total_revenue' => 0, 'today_leads' => 0
     ];
     $conversion_rate = 0;
+    $recent_activity = null;
+    $top_sales = null;
+    $campaign_performance = null;
+    $platform_stats = null;
 }
 
 include '../templates/header.php';
