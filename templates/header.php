@@ -1,6 +1,6 @@
 <?php
 // Resgrow CRM - Header Template
-// Phase 1: Project Setup & Auth
+// Phase 13: Mobile-First Optimization
 
 if (!defined('APP_NAME')) {
     require_once '../config.php';
@@ -10,7 +10,7 @@ if (!defined('APP_NAME')) {
 <html lang="en" dir="ltr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     
     <title><?php echo isset($page_title) ? $page_title . ' - ' . APP_NAME : APP_NAME; ?></title>
@@ -51,6 +51,9 @@ if (!defined('APP_NAME')) {
                             500: '#ef4444',
                             600: '#dc2626',
                         }
+                    },
+                    screens: {
+                        'xs': '475px',
                     }
                 }
             }
@@ -67,6 +70,7 @@ if (!defined('APP_NAME')) {
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Resgrow CRM">
+    <meta name="mobile-web-app-capable" content="yes">
     
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="../public/assets/images/favicon.ico">
@@ -74,87 +78,91 @@ if (!defined('APP_NAME')) {
     
     <!-- Custom Styles -->
     <style>
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #f1f5f9;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 3px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
+        /* Mobile-first responsive utilities */
+        .mobile-menu {
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
         }
         
-        /* Loading animation */
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #3b82f6;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
+        .mobile-menu.open {
+            transform: translateX(0);
         }
         
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        /* Touch-friendly buttons */
+        .touch-button {
+            min-height: 44px;
+            min-width: 44px;
         }
         
-        /* Mobile-first responsive adjustments */
-        @media (max-width: 640px) {
-            .mobile-padding {
-                padding-left: 1rem;
-                padding-right: 1rem;
+        /* Mobile-optimized tables */
+        @media (max-width: 768px) {
+            .mobile-table {
+                display: block;
+                width: 100%;
+            }
+            
+            .mobile-table thead {
+                display: none;
+            }
+            
+            .mobile-table tbody {
+                display: block;
+            }
+            
+            .mobile-table tr {
+                display: block;
+                margin-bottom: 1rem;
+                border: 1px solid #e5e7eb;
+                border-radius: 0.5rem;
+                padding: 1rem;
+                background: white;
+            }
+            
+            .mobile-table td {
+                display: block;
+                text-align: left;
+                padding: 0.5rem 0;
+                border: none;
+            }
+            
+            .mobile-table td:before {
+                content: attr(data-label) ": ";
+                font-weight: 600;
+                color: #6b7280;
             }
         }
         
-        /* Print styles */
-        @media print {
-            .no-print {
-                display: none !important;
+        /* Mobile-optimized forms */
+        @media (max-width: 768px) {
+            .mobile-form input,
+            .mobile-form select,
+            .mobile-form textarea {
+                font-size: 16px; /* Prevents zoom on iOS */
+                padding: 0.75rem;
             }
         }
     </style>
 </head>
-<body class="bg-gray-50 font-sans antialiased">
-    
-    <!-- Mobile Menu Overlay -->
-    <div id="mobile-menu-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden lg:hidden"></div>
-    
-    <?php 
-    // Show flash messages
-    $flash_messages = get_flash_messages();
-    if (!empty($flash_messages)): 
-    ?>
-    <div id="flash-messages" class="fixed top-4 right-4 z-50 space-y-2">
-        <?php foreach ($flash_messages as $flash): ?>
-        <div class="flash-message bg-<?php echo $flash['type'] === 'error' ? 'red' : ($flash['type'] === 'success' ? 'green' : 'blue'); ?>-500 text-white px-6 py-3 rounded-lg shadow-lg max-w-sm">
-            <div class="flex items-center justify-between">
-                <span><?php echo htmlspecialchars($flash['message']); ?></span>
-                <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
+<body class="bg-gray-50 text-gray-900 antialiased">
+    <!-- Mobile Header -->
+    <header class="bg-white shadow-sm border-b border-gray-200 lg:hidden">
+        <div class="flex items-center justify-between px-4 py-3">
+            <button id="mobileMenuBtn" class="touch-button p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                </svg>
+            </button>
+            
+            <h1 class="text-lg font-semibold text-gray-900"><?php echo APP_NAME; ?></h1>
+            
+            <div class="flex items-center space-x-2">
+                <div class="relative">
+                    <button id="mobileUserMenuBtn" class="touch-button p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
-        <?php endforeach; ?>
-    </div>
-    
-    <script>
-        // Auto-hide flash messages after 5 seconds
-        setTimeout(function() {
-            const flashMessages = document.getElementById('flash-messages');
-            if (flashMessages) {
-                flashMessages.style.transition = 'opacity 0.5s';
-                flashMessages.style.opacity = '0';
-                setTimeout(() => flashMessages.remove(), 500);
-            }
-        }, 5000);
-    </script>
-    <?php endif; ?>
+    </header>

@@ -182,6 +182,26 @@ CREATE TABLE `campaign_performance` (
 
 -- --------------------------------------------------------
 
+-- Table structure for table `daily_activity`
+CREATE TABLE `daily_activity` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `activity_date` date NOT NULL,
+  `leads_contacted` int(11) DEFAULT 0,
+  `calls_made` int(11) DEFAULT 0,
+  `qar_closed` decimal(10,2) DEFAULT 0.00,
+  `notes` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_user_date` (`user_id`, `activity_date`),
+  KEY `idx_user_id` (`user_id`),
+  KEY `idx_activity_date` (`activity_date`),
+  FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
 -- Table structure for table `user_settings`
 CREATE TABLE `user_settings` (
   `id` int(11) NOT NULL AUTO_INCREMENT,

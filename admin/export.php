@@ -4,9 +4,20 @@
 
 require_once '../includes/session.php';
 require_once '../includes/functions.php';
+require_once '../includes/db.php';
 
 // Require admin access
 SessionManager::requireRole('admin');
+
+// Initialize database connection
+global $db;
+if (!isset($db) || !$db) {
+    try {
+        $db = new Database();
+    } catch (Exception $e) {
+        die("Database connection failed: " . $e->getMessage());
+    }
+}
 
 // Get export parameters
 $type = $_GET['type'] ?? 'leads';
@@ -15,8 +26,6 @@ $date_from = $_GET['date_from'] ?? date('Y-m-d', strtotime('-30 days'));
 $date_to = $_GET['date_to'] ?? date('Y-m-d');
 
 try {
-    global $db;
-    
     // Generate filename
     $filename = APP_NAME . '_' . $type . '_export_' . date('Y-m-d_H-i-s');
     
@@ -74,8 +83,15 @@ function exportLeads($db, $date_from, $date_to, $format, $filename) {
     ";
     
     $stmt = $db->prepare($query);
+    if (!$stmt) {
+        throw new Exception("Failed to prepare leads query: " . $db->error);
+    }
+    
     $stmt->bind_param("ss", $date_from, $date_to);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        throw new Exception("Failed to execute leads query: " . $stmt->error);
+    }
+    
     $result = $stmt->get_result();
     
     $headers = [
@@ -113,8 +129,15 @@ function exportAnalytics($db, $date_from, $date_to, $format, $filename) {
     ";
     
     $stmt = $db->prepare($query);
+    if (!$stmt) {
+        throw new Exception("Failed to prepare analytics query: " . $db->error);
+    }
+    
     $stmt->bind_param("ss", $date_from, $date_to);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        throw new Exception("Failed to execute analytics query: " . $stmt->error);
+    }
+    
     $result = $stmt->get_result();
     
     $headers = [
@@ -151,6 +174,9 @@ function exportUsers($db, $format, $filename) {
     ";
     
     $result = $db->query($query);
+    if (!$result) {
+        throw new Exception("Failed to execute users query: " . $db->error);
+    }
     
     $headers = [
         'ID', 'Name', 'Email', 'Role', 'Status', 'Created Date', 
@@ -191,8 +217,15 @@ function exportCampaigns($db, $date_from, $date_to, $format, $filename) {
     ";
     
     $stmt = $db->prepare($query);
+    if (!$stmt) {
+        throw new Exception("Failed to prepare campaigns query: " . $db->error);
+    }
+    
     $stmt->bind_param("ss", $date_from, $date_to);
-    $stmt->execute();
+    if (!$stmt->execute()) {
+        throw new Exception("Failed to execute campaigns query: " . $stmt->error);
+    }
+    
     $result = $stmt->get_result();
     
     $headers = [
@@ -242,6 +275,7 @@ function exportAsCSV($result, $headers, $filename) {
     }
     
     fclose($output);
+    exit();
 }
 
 function exportAsPDF($result, $headers, $filename, $title) {
@@ -303,5 +337,6 @@ function exportAsPDF($result, $headers, $filename, $title) {
     
     echo "</table>";
     echo "</body></html>";
+    exit();
 }
 ?>

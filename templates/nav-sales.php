@@ -19,6 +19,14 @@ $current_page = basename($_SERVER['PHP_SELF'], '.php');
                        class="<?php echo in_array($current_page, ['leads', 'lead-detail']) ? 'border-blue-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'; ?> inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                         Leads
                     </a>
+                    <a href="feedback.php" 
+                       class="<?php echo $current_page === 'feedback' ? 'border-blue-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'; ?> inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                        Feedback
+                    </a>
+                    <a href="activity-tracker.php" 
+                       class="<?php echo $current_page === 'activity-tracker' ? 'border-blue-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'; ?> inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                        Activity Tracker
+                    </a>
                     <a href="reports.php" 
                        class="<?php echo $current_page === 'reports' ? 'border-blue-500 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'; ?> inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                         Reports
@@ -70,6 +78,14 @@ $current_page = basename($_SERVER['PHP_SELF'], '.php');
             <a href="leads.php" 
                class="<?php echo in_array($current_page, ['leads', 'lead-detail']) ? 'bg-blue-50 border-blue-500 text-blue-700' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800'; ?> block pl-3 pr-4 py-2 border-l-4 text-base font-medium">
                 Leads
+            </a>
+            <a href="feedback.php" 
+               class="<?php echo $current_page === 'feedback' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800'; ?> block pl-3 pr-4 py-2 border-l-4 text-base font-medium">
+                Feedback
+            </a>
+            <a href="activity-tracker.php" 
+               class="<?php echo $current_page === 'activity-tracker' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800'; ?> block pl-3 pr-4 py-2 border-l-4 text-base font-medium">
+                Activity Tracker
             </a>
             <a href="reports.php" 
                class="<?php echo $current_page === 'reports' ? 'bg-blue-50 border-blue-500 text-blue-700' : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800'; ?> block pl-3 pr-4 py-2 border-l-4 text-base font-medium">
