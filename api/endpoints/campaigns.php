@@ -387,4 +387,8 @@ class CampaignsAPI {
         exit();
     }
 }
+<<<<<<< HEAD
 ?>
+=======
+?>
+>>>>>>> e981dd606dbc3d13315396933ec31366209c7f6d

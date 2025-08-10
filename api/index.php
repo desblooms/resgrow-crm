@@ -212,4 +212,8 @@ class APIRouter {
 // Initialize and route
 $router = new APIRouter();
 $router->route();
+<<<<<<< HEAD
 ?>
+=======
+?>
+>>>>>>> e981dd606dbc3d13315396933ec31366209c7f6d
